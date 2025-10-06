@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>マウストラッキング花火風パーティクル（色変更）</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000;
+        }
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="particleCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('particleCanvas');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+        let mouse = { x: 0, y: 0 };
+        let lastMouse = { x: 0, y: 0 };
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        window.addEventListener('mousemove', (e) => {
+            mouse.x = e.clientX;
+            mouse.y = e.clientY;
+
+            const dx = mouse.x - lastMouse.x;
+            const dy = mouse.y - lastMouse.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            // マウスの移動速度に応じてパーティクルを生成
+            const count = Math.min(Math.floor(distance / 5) + 3, 30); 
+
+            for (let i = 0; i < count; i++) {
+                const ratio = i / count;
+                const px = lastMouse.x + dx * ratio;
+                const py = lastMouse.y + dy * ratio;
+                particles.push(new Particle(px, py));
+            }
+            
+            lastMouse.x = mouse.x;
+            lastMouse.y = mouse.y;
+        });
+
+        class Particle {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                
+                // 四方八方に飛び散るためのランダムな初期速度
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 8 + 2;
+                this.vx = Math.cos(angle) * speed;
+                this.vy = Math.sin(angle) * speed;
+
+                this.size = Math.random() * 3 + 1;
+                this.alpha = 1;
+                this.life = 100;
+                
+                // --- ★★★ 色の変更ポイント ★★★ ---
+                // パーティクルが持つランダムな色相を固定し、白?暖色系の光の残光を表現します
+                this.hue = Math.floor(Math.random() * 50); // 0 (赤) から 50 (黄色) の間でランダムな色相を選択
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                
+                this.vx *= 0.95; 
+                this.vy *= 0.95; 
+                this.vy += 0.05; 
+
+                this.size *= 0.96;
+                this.alpha -= 0.01;
+                this.life--;
+
+                // --- ★★★ 色のグラデーション変化 ★★★ ---
+                // 寿命に応じて色相(hue)を変化させることで、グラデーションを実現します
+                // 粒子のライフが減るにつれて、色を黄色(50)から赤(0)へ変化させます。
+                this.hue -= 0.5; 
+            }
+
+            draw() {
+                // HSL (色相, 彩度, 明度) を使って色を設定
+                // 明度(Lightness)を高く保ち、鮮やかな光を表現します
+                this.color = `hsl(${this.hue}, 100%, 70%)`; 
+                
+                ctx.globalAlpha = this.alpha;
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // 画面を薄く透明な黒で塗りつぶし、尾（軌跡）を作る
+            ctx.globalAlpha = 0.1; 
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.globalAlpha = 1;
+
+            for (let i = 0; i < particles.length; i++) {
+                particles[i].update();
+                particles[i].draw();
+            }
+
+            particles = particles.filter(p => p.size > 0.5 && p.life > 0);
+        }
+
+        lastMouse.x = canvas.width / 2;
+        lastMouse.y = canvas.height / 2;
+        
+        animate();
+    </script>
+</body>
+</html>
