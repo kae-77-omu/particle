@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>なでなで好感度ゲーム (猫)</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+            font-family: sans-serif;
+        }
+
+        #game-container {
+            width: 400px;
+            text-align: center;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        /* ゲージのスタイル */
+        #gauge-container {
+            width: 100%;
+            height: 30px;
+            background-color: #ddd;
+            border-radius: 15px;
+            overflow: hidden;
+            margin-bottom: 20px;
+            border: 2px solid #333;
+        }
+
+        #gauge-bar {
+            height: 100%;
+            width: 0%;
+            background-color: #ff69b4; /* ピンク */
+            transition: width 0.1s linear; /* なめらかな動き */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+
+        /* 猫の画像表示エリア */
+        #pet-area {
+            position: relative;
+            width: 300px;
+            height: 300px;
+            margin: 0 auto 20px;
+            cursor: grab;
+            border: 5px dashed #ccc;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5em;
+            color: #666;
+            background-color: #fafafa;
+        }
+
+        #pet-image {
+            width: 100%;
+            height: 100%;
+            background-image: url('https://placehold.jp/300x300.png?text=%20猫'); /* プレースホルダー画像 */
+            background-size: cover;
+            border-radius: 5px;
+            transition: transform 0.1s;
+        }
+
+        #status-message {
+            margin-top: 10px;
+            font-weight: bold;
+            color: #4CAF50;
+            min-height: 20px;
+        }
+        
+        /* ゲージ満タン時のスタイル */
+        .completed #gauge-bar {
+            background-color: #008000; /* 緑 */
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <h2>なでなで好感度ゲーム</h2>
+    <p>猫をなでて、好感度を満タンにしよう！ (ドラッグ操作でなでられます)</p>
+    
+    <div id="gauge-container">
+        <div id="gauge-bar">0%</div>
+    </div>
+
+    <div id="pet-area">
+        <div id="pet-image"></div>
+    </div>
+
+    <div id="status-message"></div>
+</div>
+
+<script>
+    // --- ゲーム設定 ---
+    const MAX_FAVORABILITY = 1000; // 満タンに必要な好感度
+    const HEAD_REGION_Y = 100; // 頭と認識するY座標の境界 (上から100px)
+    const BACK_REGION_Y = 250; // 背中と認識するY座標の境界 (上から100pxから250px)
+
+    // --- DOM要素 ---
+    const petArea = document.getElementById('pet-area');
+    const petImage = document.getElementById('pet-image');
+    const gaugeBar = document.getElementById('gauge-bar');
+    const statusMessage = document.getElementById('status-message');
+    const gameContainer = document.getElementById('game-container');
+
+    // --- 変数 ---
+    let favorability = 0;
+    let isPetting = false;
+    let lastX = 0;
+    let lastY = 0;
+
+    // --- 好感度を更新する関数 ---
+    function updateFavorability(delta) {
+        // 既に満タンなら何もしない
+        if (favorability >= MAX_FAVORABILITY) return;
+
+        favorability += delta;
+        
+        // ゲージ上限を設定
+        if (favorability > MAX_FAVORABILITY) {
+            favorability = MAX_FAVORABILITY;
+        }
+
+        // ゲージの表示を更新
+        const percent = Math.floor((favorability / MAX_FAVORABILITY) * 100);
+        gaugeBar.style.width = percent + '%';
+        gaugeBar.textContent = percent + '%';
+        
+        // 満タンになった時の処理
+        if (favorability >= MAX_FAVORABILITY) {
+            gaugeBar.textContent = ' 満タン！ ';
+            statusMessage.textContent = '最高の気分！あなたは親友です！';
+            gameContainer.classList.add('completed'); // ゲージの色を変える
+            petImage.style.transform = 'scale(1.05)'; // 満足して少し大きくなる
+            petArea.style.cursor = 'default';
+        }
+    }
+
+    // --- マウスが押された時 (撫で始め) ---
+    petArea.addEventListener('mousedown', (e) => {
+        if (favorability >= MAX_FAVORABILITY) return;
+
+        isPetting = true;
+        lastX = e.clientX;
+        lastY = e.clientY;
+        petArea.style.cursor = 'grabbing';
+    });
+
+    // --- マウスが動いている時 (撫でている間) ---
+    petArea.addEventListener('mousemove', (e) => {
+        if (!isPetting || favorability >= MAX_FAVORABILITY) return;
+
+        const currentX = e.clientX;
+        const currentY = e.clientY;
+
+        // マウスの移動距離を計算 (なでた距離)
+        const distance = Math.sqrt(
+            Math.pow(currentX - lastX, 2) + Math.pow(currentY - lastY, 2)
+        );
+
+        // 好感度の増加量 (移動距離に比例)
+        let addFavorability = distance * 0.5; 
+
+        // ------------------------------------------------
+        // 撫でた部位によってボーナスを判定
+        // ------------------------------------------------
+        
+        // 相対座標を取得
+        const rect = petArea.getBoundingClientRect();
+        const relativeY = currentY - rect.top;
+
+        // 猫の画像エリアの高さに対する割合
+        const ratioY = relativeY / rect.height * 300; // 300px基準に変換
+
+        let message = '';
+        
+        if (ratioY < HEAD_REGION_Y) {
+            // 頭をなでている (ボーナス大)
+            addFavorability *= 1.5;
+            message = '頭をなでると喜ぶ！';
+        } else if (ratioY < BACK_REGION_Y) {
+            // 背中をなでている (標準)
+            addFavorability *= 1.0;
+            message = '気持ちよさそう...';
+        } else {
+            // それ以外 (足、しっぽなど。ボーナスなし/減点もなしでシンプルに)
+            addFavorability *= 0.5; // 気持ち控えめ
+            message = 'すりすり...';
+        }
+        
+        // 好感度を更新
+        if (addFavorability > 0) {
+            updateFavorability(addFavorability);
+            statusMessage.textContent = message;
+            
+            // 猫が反応するアニメーション
+            petImage.style.transform = 'scale(1.01)';
+            setTimeout(() => {
+                if (favorability < MAX_FAVORABILITY) {
+                    petImage.style.transform = 'scale(1)';
+                }
+            }, 50);
+        }
+
+
+        // 現在地を次の始点として保存
+        lastX = currentX;
+        lastY = currentY;
+    });
+
+    // --- マウスが離された時 / エリア外に出た時 (撫で終わり) ---
+    const stopPetting = () => {
+        isPetting = false;
+        if (favorability < MAX_FAVORABILITY) {
+            petArea.style.cursor = 'grab';
+        }
+        // なでるのをやめたらメッセージをクリア
+        setTimeout(() => {
+            if (favorability < MAX_FAVORABILITY) {
+                statusMessage.textContent = '';
+            }
+        }, 1000);
+    };
+    
+    petArea.addEventListener('mouseup', stopPetting);
+    // マウスがウィンドウ外で離されても止まるように
+    document.addEventListener('mouseup', stopPetting);
+</script>
+
+</body>
+</html>
