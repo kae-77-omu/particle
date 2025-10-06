@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>なでなで好感度ゲーム (猫)</title>
+    <title>電子ペットの機嫌操作ゲーム</title>
     <style>
         body {
             display: flex;
@@ -12,17 +12,17 @@
             justify-content: center;
             min-height: 100vh;
             margin: 0;
-            background-color: #f0f0f0;
-            font-family: sans-serif;
+            background-color: #e0f7fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
 
         #game-container {
-            width: 400px;
+            width: 450px;
             text-align: center;
             background-color: #fff;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
         }
 
         /* ゲージのスタイル */
@@ -39,211 +39,234 @@
         #gauge-bar {
             height: 100%;
             width: 0%;
-            background-color: #ff69b4; /* ピンク */
-            transition: width 0.1s linear; /* なめらかな動き */
+            background-color: #ffcc00; /* 黄色 */
+            transition: width 0.3s ease;
             display: flex;
             align-items: center;
             justify-content: center;
+            color: #333;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        /* ペットの表示エリア */
+        #pet-display {
+            font-size: 5em;
+            margin: 20px 0;
+            min-height: 100px;
+        }
+        
+        #pet-name {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #00796b;
+            margin-bottom: 5px;
+        }
+
+        #pet-request {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: #d32f2f; /* 赤 */
+            min-height: 25px;
+            margin-bottom: 15px;
+        }
+
+        /* ボタンエリア */
+        #action-buttons button {
+            padding: 10px 20px;
+            margin: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            border: none;
+            border-radius: 8px;
+            transition: background-color 0.2s;
+            background-color: #00bcd4; /* シアン */
             color: white;
             font-weight: bold;
         }
 
-        /* 猫の画像表示エリア */
-        #pet-area {
-            position: relative;
-            width: 300px;
-            height: 300px;
-            margin: 0 auto 20px;
-            cursor: grab;
-            border: 5px dashed #ccc;
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.5em;
-            color: #666;
-            background-color: #fafafa;
-        }
-
-        #pet-image {
-            width: 100%;
-            height: 100%;
-            /* --- ご提供いただいた猫の画像を埋め込みました --- */
-            background-image: url('https://i.imgur.com/E1z11P3.png'); /* アップロードした画像のURL */
-            background-size: contain; /* 画像全体が表示されるように */
-            background-repeat: no-repeat;
-            background-position: center;
-            border-radius: 5px;
-            transition: transform 0.1s;
-        }
-
-        #status-message {
-            margin-top: 10px;
-            font-weight: bold;
-            color: #4CAF50;
-            min-height: 20px;
+        #action-buttons button:hover:not(:disabled) {
+            background-color: #0097a7;
         }
         
+        #action-buttons button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+
         /* ゲージ満タン時のスタイル */
         .completed #gauge-bar {
-            background-color: #008000; /* 緑 */
+            background-color: #4CAF50; /* 緑 */
+            color: white;
         }
     </style>
 </head>
 <body>
 
 <div id="game-container">
-    <h2>なでなで好感度ゲーム</h2>
-    <p>猫をなでて、好感度を満タンにしよう！ (ドラッグ操作でなでられます)</p>
+    <h2>電子ペット「ピヨ」の機嫌ゲーム</h2>
     
     <div id="gauge-container">
         <div id="gauge-bar">0%</div>
     </div>
 
-    <div id="pet-area">
-        <div id="pet-image"></div>
+    <div id="pet-name">ピヨ</div>
+    <div id="pet-display"></div>
+    <div id="pet-request"></div>
+    
+    <div id="action-buttons">
+        <button id="action-food" data-action="food">エサをあげる</button>
+        <button id="action-play" data-action="play">遊んであげる</button>
+        <button id="action-sleep" data-action="sleep">寝かせる</button>
     </div>
 
-    <div id="status-message"></div>
+    <p id="game-status" style="margin-top: 20px; color: #333;">機嫌を100%にしよう！</p>
 </div>
 
 <script>
     // --- ゲーム設定 ---
-    const MAX_FAVORABILITY = 1000; // 満タンに必要な好感度
-    // 画像に合わせて、猫の「頭部」と「背中」の境界を調整しました。
-    // この画像だと、顔と体の境界が分かりにくいため、適当に調整しています。
-    const HEAD_REGION_Y = 100; // 顔のあたりを頭と認識するY座標の境界 (上から100px)
-    const BACK_REGION_Y = 250; // 顔から下の体を背中と認識するY座標の境界 (上から100pxから250px)
+    const MAX_FAVORABILITY = 100; // 満タンに必要な機嫌
+    const REQUIREMENT_INTERVAL = 3000; // 3秒ごとに要求を出す
+    const PENALTY_AMOUNT = -5; // 要求を無視した時の減少量
+    const REWARD_AMOUNT = 15; // 正しく対応した時の増加量
+    
+    // 要求とその対応
+    const REQUIREMENTS = {
+        food: { message: 'お腹すいたよ...', emoji: '' },
+        play: { message: 'かまって！', emoji: '' },
+        sleep: { message: 'ねむねむ...', emoji: '' }
+    };
 
     // --- DOM要素 ---
-    const petArea = document.getElementById('pet-area');
-    const petImage = document.getElementById('pet-image');
     const gaugeBar = document.getElementById('gauge-bar');
-    const statusMessage = document.getElementById('status-message');
+    const petDisplay = document.getElementById('pet-display');
+    const petRequest = document.getElementById('pet-request');
+    const actionButtons = document.querySelectorAll('#action-buttons button');
+    const gameStatus = document.getElementById('game-status');
     const gameContainer = document.getElementById('game-container');
 
     // --- 変数 ---
-    let favorability = 0;
-    let isPetting = false;
-    let lastX = 0;
-    let lastY = 0;
+    let favorability = 50; // 初期機嫌
+    let currentRequirement = null;
+    let gameInterval = null;
+    let isGameOver = false;
 
-    // --- 好感度を更新する関数 ---
+    // --- 状態更新関数 ---
     function updateFavorability(delta) {
-        // 既に満タンなら何もしない
-        if (favorability >= MAX_FAVORABILITY) return;
+        if (isGameOver) return;
 
         favorability += delta;
         
-        // ゲージ上限を設定
-        if (favorability > MAX_FAVORABILITY) {
-            favorability = MAX_FAVORABILITY;
-        }
+        // ゲージの最大/最小設定
+        if (favorability > MAX_FAVORABILITY) favorability = MAX_FAVORABILITY;
+        if (favorability < 0) favorability = 0;
 
         // ゲージの表示を更新
         const percent = Math.floor((favorability / MAX_FAVORABILITY) * 100);
         gaugeBar.style.width = percent + '%';
         gaugeBar.textContent = percent + '%';
         
-        // 満タンになった時の処理
+        // --- 機嫌によるペットの表情変化 ---
+        if (percent >= 80) petDisplay.textContent = '';
+        else if (percent >= 50) petDisplay.textContent = '';
+        else if (percent >= 20) petDisplay.textContent = '';
+        else petDisplay.textContent = '';
+
+        // --- ゲームクリア判定 ---
         if (favorability >= MAX_FAVORABILITY) {
-            gaugeBar.textContent = ' 満タン！ ';
-            statusMessage.textContent = '最高の気分！あなたは親友です！';
-            gameContainer.classList.add('completed'); // ゲージの色を変える
-            petImage.style.transform = 'scale(1.05)'; // 満足して少し大きくなる
-            petArea.style.cursor = 'default';
+            endGame('CLEAR');
+        } else if (favorability <= 0) {
+            endGame('GAMEOVER');
         }
     }
 
-    // --- マウスが押された時 (撫で始め) ---
-    petArea.addEventListener('mousedown', (e) => {
-        if (favorability >= MAX_FAVORABILITY) return;
+    // --- ランダムな要求を出す ---
+    function issueRequirement() {
+        // 前の要求が残っていた場合、ペナルティ
+        if (currentRequirement) {
+            gameStatus.textContent = '要求を無視した！機嫌が下がった...';
+            updateFavorability(PENALTY_AMOUNT);
+        }
 
-        isPetting = true;
-        lastX = e.clientX;
-        lastY = e.clientY;
-        petArea.style.cursor = 'grabbing';
-    });
+        if (isGameOver) return;
 
-    // --- マウスが動いている時 (撫でている間) ---
-    petArea.addEventListener('mousemove', (e) => {
-        if (!isPetting || favorability >= MAX_FAVORABILITY) return;
-
-        const currentX = e.clientX;
-        const currentY = e.clientY;
-
-        // マウスの移動距離を計算 (なでた距離)
-        const distance = Math.sqrt(
-            Math.pow(currentX - lastX, 2) + Math.pow(currentY - lastY, 2)
-        );
-
-        // 好感度の増加量 (移動距離に比例)
-        let addFavorability = distance * 0.5; 
-
-        // ------------------------------------------------
-        // 撫でた部位によってボーナスを判定
-        // ------------------------------------------------
+        // 新しい要求をランダムに選択
+        const keys = Object.keys(REQUIREMENTS);
+        const randomKey = keys[Math.floor(Math.random() * keys.length)];
         
-        // 相対座標を取得
-        const rect = petArea.getBoundingClientRect();
-        const relativeY = currentY - rect.top;
-
-        // 猫の画像エリアの高さに対する割合
-        const ratioY = relativeY / rect.height * 300; // 300px基準に変換 (petAreaの高さ)
-
-        let message = '';
+        currentRequirement = randomKey;
+        petRequest.textContent = REQUIREMENTS[randomKey].message;
         
-        if (ratioY < HEAD_REGION_Y) {
-            // 頭をなでている (ボーナス大)
-            addFavorability *= 1.5;
-            message = '頭をなでると喜ぶ！';
-        } else if (ratioY < BACK_REGION_Y) {
-            // 背中をなでている (標準)
-            addFavorability *= 1.0;
-            message = '気持ちよさそう...';
+        // 要求時の特別な表情
+        petDisplay.textContent = REQUIREMENTS[randomKey].emoji;
+        
+        // ボタンを有効化
+        actionButtons.forEach(button => button.disabled = false);
+    }
+
+    // --- プレイヤーの行動処理 ---
+    function handleAction(action) {
+        if (isGameOver || !currentRequirement) return;
+
+        // ボタンを押したら一旦全て無効化
+        actionButtons.forEach(button => button.disabled = true);
+        
+        if (action === currentRequirement) {
+            // 正解
+            updateFavorability(REWARD_AMOUNT);
+            gameStatus.textContent = `「${action}」で満足！機嫌が上がった！`;
         } else {
-            // それ以外 (足、しっぽなど。気持ち控えめ)
-            addFavorability *= 0.5; 
-            message = 'すりすり...';
+            // 不正解
+            updateFavorability(PENALTY_AMOUNT);
+            gameStatus.textContent = `「${action}」は気分じゃないみたい... 機嫌が下がった。`;
         }
         
-        // 好感度を更新
-        if (addFavorability > 0) {
-            updateFavorability(addFavorability);
-            statusMessage.textContent = message;
-            
-            // 猫が反応するアニメーション
-            petImage.style.transform = 'scale(1.01)';
-            setTimeout(() => {
-                if (favorability < MAX_FAVORABILITY) {
-                    petImage.style.transform = 'scale(1)';
-                }
-            }, 50);
+        // 要求をリセット
+        currentRequirement = null;
+        petRequest.textContent = '';
+    }
+
+    // --- ゲーム終了処理 ---
+    function endGame(result) {
+        isGameOver = true;
+        clearInterval(gameInterval);
+        petRequest.textContent = '';
+        actionButtons.forEach(button => button.disabled = true);
+
+        if (result === 'CLEAR') {
+            gameStatus.textContent = 'ゲームクリア！最高の友達になった！';
+            petDisplay.textContent = '';
+            gameContainer.classList.add('completed');
+        } else if (result === 'GAMEOVER') {
+            gameStatus.textContent = 'ゲームオーバー...ピヨはそっぽを向いた...';
+            petDisplay.textContent = '';
+            gaugeBar.textContent = '0%';
         }
+    }
 
-
-        // 現在地を次の始点として保存
-        lastX = currentX;
-        lastY = currentY;
-    });
-
-    // --- マウスが離された時 / エリア外に出た時 (撫で終わり) ---
-    const stopPetting = () => {
-        isPetting = false;
-        if (favorability < MAX_FAVORABILITY) {
-            petArea.style.cursor = 'grab';
-        }
-        // なでるのをやめたらメッセージをクリア
+    // --- 初期化とゲーム開始 ---
+    function initGame() {
+        // ボタンにイベントリスナーを設定
+        actionButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                handleAction(button.dataset.action);
+            });
+            button.disabled = false; // 初期化時は有効
+        });
+        
+        updateFavorability(0); // 最初のゲージ表示
+        gameStatus.textContent = 'ボタンを押してピヨの要求に応えよう！';
+        
+        // 定期的に要求を出すタイマーを設定
+        // 最初の要求は少し遅らせる
         setTimeout(() => {
-            if (favorability < MAX_FAVORABILITY) {
-                statusMessage.textContent = '';
-            }
-        }, 1000);
-    };
-    
-    petArea.addEventListener('mouseup', stopPetting);
-    // マウスがウィンドウ外で離されても止まるように
-    document.addEventListener('mouseup', stopPetting);
+            issueRequirement();
+            gameInterval = setInterval(issueRequirement, REQUIREMENT_INTERVAL);
+        }, 1000); 
+    }
+
+    // ゲーム開始
+    initGame();
 </script>
 
 </body>
