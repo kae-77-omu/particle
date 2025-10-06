@@ -68,8 +68,11 @@
         #pet-image {
             width: 100%;
             height: 100%;
-            background-image: url('https://placehold.jp/300x300.png?text=%20猫'); /* プレースホルダー画像 */
-            background-size: cover;
+            /* --- ご提供いただいた猫の画像を埋め込みました --- */
+            background-image: url('https://i.imgur.com/E1z11P3.png'); /* アップロードした画像のURL */
+            background-size: contain; /* 画像全体が表示されるように */
+            background-repeat: no-repeat;
+            background-position: center;
             border-radius: 5px;
             transition: transform 0.1s;
         }
@@ -107,8 +110,10 @@
 <script>
     // --- ゲーム設定 ---
     const MAX_FAVORABILITY = 1000; // 満タンに必要な好感度
-    const HEAD_REGION_Y = 100; // 頭と認識するY座標の境界 (上から100px)
-    const BACK_REGION_Y = 250; // 背中と認識するY座標の境界 (上から100pxから250px)
+    // 画像に合わせて、猫の「頭部」と「背中」の境界を調整しました。
+    // この画像だと、顔と体の境界が分かりにくいため、適当に調整しています。
+    const HEAD_REGION_Y = 100; // 顔のあたりを頭と認識するY座標の境界 (上から100px)
+    const BACK_REGION_Y = 250; // 顔から下の体を背中と認識するY座標の境界 (上から100pxから250px)
 
     // --- DOM要素 ---
     const petArea = document.getElementById('pet-area');
@@ -184,7 +189,7 @@
         const relativeY = currentY - rect.top;
 
         // 猫の画像エリアの高さに対する割合
-        const ratioY = relativeY / rect.height * 300; // 300px基準に変換
+        const ratioY = relativeY / rect.height * 300; // 300px基準に変換 (petAreaの高さ)
 
         let message = '';
         
@@ -197,8 +202,8 @@
             addFavorability *= 1.0;
             message = '気持ちよさそう...';
         } else {
-            // それ以外 (足、しっぽなど。ボーナスなし/減点もなしでシンプルに)
-            addFavorability *= 0.5; // 気持ち控えめ
+            // それ以外 (足、しっぽなど。気持ち控えめ)
+            addFavorability *= 0.5; 
             message = 'すりすり...';
         }
         
