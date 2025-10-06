@@ -37,88 +37,91 @@
             margin-bottom: 5px;
         }
 
-        /* ゲージのスタイル */
+        /* ゲージのスタイル ********************* 修正点1: 視認性向上 *********************/
         #gauge-container {
             width: 100%;
-            height: 30px;
-            background-color: #f8bbd0; /* 淡いピンクの背景 */
-            border-radius: 15px;
+            height: 35px; /* 高さ少しアップ */
+            background-color: #f8bbd0;
+            border-radius: 18px; 
             overflow: hidden;
             margin-bottom: 20px;
-            border: 3px solid #ff69b4; /* ゲージの枠をピンクに */
+            border: 4px solid #ff69b4; /* 枠線を太く強調 */
+            box-sizing: border-box;
         }
 
         #gauge-bar {
             height: 100%;
             width: 0%;
-            background-color: #ffc0cb; /* メインゲージを桜色に */
+            background-color: #ffc0cb;
             transition: width 0.3s ease;
             display: flex;
             align-items: center;
             justify-content: center;
-            color: #333;
-            font-weight: 800; /* 太字 */
-            font-size: 14px;
+            color: #555; /* 文字色を濃く */
+            font-weight: 900; 
+            font-size: 16px; /* 文字サイズアップ */
+            text-shadow: 1px 1px 0 #fff; /* 文字に影をつけて見やすく */
         }
 
         /* ペットの表示エリア */
         #pet-name {
-            font-size: 1.8em; /* 名前を少し大きく */
+            font-size: 1.8em;
             font-weight: 800;
-            color: #880e4f; /* 濃いめのピンク */
+            color: #880e4f;
             margin-bottom: 5px;
-            text-shadow: 1px 1px 0 #ffc0cb; /* 文字に影をつけて立体的に */
+            text-shadow: 1px 1px 0 #ffc0cb;
         }
         
         #pet-display {
             font-size: 5em;
             margin: 10px 0 20px;
             min-height: 100px;
-            transition: transform 0.2s; /* アニメーションの準備 */
+            transition: transform 0.2s;
         }
 
         #pet-request {
             font-size: 1.4em;
             font-weight: 700;
-            color: #d32f2f; /* 要求は目立つように赤を維持 */
+            color: #d32f2f;
             min-height: 25px;
             margin-bottom: 15px;
         }
 
         /* ボタンエリア */
         #action-buttons button {
-            padding: 12px 25px; /* ボタンを少し大きく */
+            padding: 12px 25px;
             margin: 8px;
             font-size: 18px;
             cursor: pointer;
             border: none;
-            border-radius: 12px; /* 角を大きく丸く */
+            border-radius: 12px;
             transition: all 0.2s;
-            background-color: #a7ffeb; /* ボタンをミントグリーンに */
+            background-color: #a7ffeb;
             color: #333;
             font-weight: bold;
-            box-shadow: 0 4px 0 #689f91; /* ボタンに影をつけて押しやすく */
+            box-shadow: 0 4px 0 #689f91;
         }
 
         #action-buttons button:hover:not(:disabled) {
-            background-color: #64ffda; /* ホバーで少し明るく */
+            background-color: #64ffda;
         }
         
         #action-buttons button:active:not(:disabled) {
             box-shadow: none;
-            transform: translateY(4px); /* 押された時のアニメーション */
+            transform: translateY(4px);
         }
         
         #action-buttons button:disabled {
-            background-color: #e0f2f1; /* 無効化ボタンは淡い色 */
+            background-color: #e0f2f1;
             color: #999;
             box-shadow: none;
         }
 
         /* ゲージ満タン時のスタイル */
         .completed #gauge-bar {
-            background-color: #4CAF50; /* 緑 */
+            background-color: #4CAF50;
             color: white;
+            text-shadow: none;
         }
         
         /* --- スタート/ゲームオーバー画面（オーバーレイ） --- */
@@ -128,7 +131,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(255, 255, 255, 0.98); /* 白に近い透過度 */
+            background-color: rgba(255, 255, 255, 0.98);
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -145,7 +148,7 @@
             padding: 18px 40px;
             font-size: 24px;
             font-weight: 800;
-            background-color: #ff69b4; /* メインカラーのピンク */
+            background-color: #ff69b4;
             color: white;
             border: none;
             border-radius: 15px;
@@ -222,12 +225,12 @@
     
     // 好感度に応じた表情（顔文字）
     const EMOTIONS = [
-        { threshold: 80, face: '(*^-^*)' }, // 80%以上: とても機嫌が良い
-        { threshold: 50, face: '(^v^)' }, // 50%以上: 良い気分
-        { threshold: 20, face: '(-_-)' }, // 20%以上: 不満気
-        { threshold: 0, face: '(T_T)' } // 0%付近: 泣いている
+        { threshold: 80, face: '(*^-^*)' }, 
+        { threshold: 50, face: '(^v^)' }, 
+        { threshold: 20, face: '(-_-)' }, // 20%以上
+        { threshold: 0, face: '(T_T)' } // 0%付近
     ];
-
+    
     // --- DOM要素 ---
     const gaugeBar = document.getElementById('gauge-bar');
     const petDisplay = document.getElementById('pet-display');
@@ -247,6 +250,16 @@
     let gameInterval = null;
     let isGameActive = false;
 
+    // --- 機嫌に応じた顔文字を取得するヘルパー関数 ---
+    function getEmotionFace(percent) {
+        for(const emotion of EMOTIONS) {
+            if (percent >= emotion.threshold) {
+                return emotion.face;
+            }
+        }
+        return EMOTIONS[EMOTIONS.length - 1].face; // 安全のため最低値を返す
+    }
+    
     // --- 状態更新関数 ---
     function updateFavorability(delta) {
         if (!isGameActive) return;
@@ -261,16 +274,10 @@
         gaugeBar.textContent = percent + '%';
         
         // --- 機嫌によるペットの表情変化 (顔文字) ---
-        let currentFace = '';
-        for(const emotion of EMOTIONS) {
-            if (percent >= emotion.threshold) {
-                currentFace = emotion.face;
-                break;
-            }
-        }
-        petDisplay.textContent = currentFace;
+        petDisplay.textContent = getEmotionFace(percent);
+        
         // 機嫌が良いときは少しアニメーション
-        if(percent >= 80) petDisplay.style.transform = 'scale(1.1)';
+        if(percent >= 80) petDisplay.style.transform = 'scale(1.1) rotate(5deg)';
         else petDisplay.style.transform = 'scale(1)';
 
 
@@ -290,6 +297,12 @@
         if (currentRequirement) {
             gameStatus.textContent = '要求を無視した！機嫌が下がった...';
             updateFavorability(PENALTY_AMOUNT);
+            
+            // --- 修正点2: 不正解時の表情変更 ---
+            petDisplay.textContent = '(-_-;)'; // 要求無視で悲しい顔
+            setTimeout(() => {
+                if (isGameActive) updateFavorability(0); // 1秒後には通常の機嫌顔に戻す
+            }, 1000);
         }
 
         if (!isGameActive) return;
@@ -300,7 +313,6 @@
         currentRequirement = randomKey;
         petRequest.textContent = REQUIREMENTS[randomKey].message;
         
-        // ボタンを有効化
         actionButtons.forEach(button => button.disabled = false);
     }
 
@@ -308,7 +320,6 @@
     function handleAction(action) {
         if (!isGameActive || !currentRequirement) return;
 
-        // ボタンを押したら一旦全て無効化
         actionButtons.forEach(button => button.disabled = true);
         
         if (action === currentRequirement) {
@@ -319,9 +330,14 @@
             // 不正解
             updateFavorability(PENALTY_AMOUNT);
             gameStatus.textContent = `「${action}」は気分じゃないみたい... 機嫌が下がった。`;
+            
+            // --- 修正点2: 不正解時の表情変更 ---
+            petDisplay.textContent = '(-_-;)'; // 不正解で悲しい顔
+            setTimeout(() => {
+                if (isGameActive) updateFavorability(0); // 1秒後には通常の機嫌顔に戻す
+            }, 1000);
         }
         
-        // 要求をリセット
         currentRequirement = null;
         petRequest.textContent = '';
     }
@@ -333,7 +349,6 @@
         petRequest.textContent = '';
         actionButtons.forEach(button => button.disabled = true);
 
-        // オーバーレイを表示
         overlay.classList.remove('hidden');
         startButton.style.display = 'none';
         restartButton.style.display = 'inline-block';
@@ -357,24 +372,20 @@
 
     // --- ゲームのリセットと開始 ---
     function startGame() {
-        // 状態をリセット
         favorability = 50;
         isGameActive = true;
         currentRequirement = null;
         gameContainer.classList.remove('completed');
         
-        // 画面をリセット
         overlay.classList.add('hidden');
         gameStatus.textContent = 'きげんを100%にしよう！';
         petRequest.textContent = '';
         
-        // ゲージと表情を初期化
         updateFavorability(0); 
         
-        // ボタンを有効化
         actionButtons.forEach(button => button.disabled = false);
         
-        // タイマー開始
+        if (gameInterval) clearInterval(gameInterval); // 既存のインターバルをクリア
         gameInterval = setInterval(issueRequirement, REQUIREMENT_INTERVAL);
         setTimeout(issueRequirement, 1000); 
     }
@@ -383,17 +394,15 @@
     startButton.addEventListener('click', startGame);
     restartButton.addEventListener('click', startGame);
     
-    // 行動ボタンにイベントリスナーを設定
     actionButtons.forEach(button => {
         button.addEventListener('click', () => {
             handleAction(button.dataset.action);
         });
-        button.disabled = true; // ゲーム開始前は無効化
+        button.disabled = true;
     });
 
     // 初期表示
     updateFavorability(0);
-    // 初期オーバーレイの状態を設定
     finalMessage.classList.remove('clear-message', 'gameover-message');
     finalMessage.textContent = '電子ペット「ピヨ」を育てるぞ！';
     overlayStatus.textContent = '制限時間内に要求に応えて、きげんを満タンにしよう。';
