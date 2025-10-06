@@ -23,6 +23,7 @@
             padding: 30px;
             border-radius: 15px;
             box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+            position: relative; /* スタート/オーバーレイ用 */
         }
 
         /* ゲージのスタイル */
@@ -99,6 +100,56 @@
             background-color: #4CAF50; /* 緑 */
             color: white;
         }
+        
+        /* --- スタート/ゲームオーバー画面（オーバーレイ） --- */
+        #overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.95);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+            border-radius: 15px;
+            transition: opacity 0.5s;
+        }
+        
+        #overlay.hidden {
+            display: none;
+        }
+
+        #start-button, #restart-button {
+            padding: 15px 30px;
+            font-size: 20px;
+            font-weight: bold;
+            background-color: #ff69b4; /* ピンク */
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            margin-top: 20px;
+            box-shadow: 0 4px 0 #c2528c;
+        }
+        
+        #start-button:active, #restart-button:active {
+            box-shadow: none;
+            transform: translateY(4px);
+        }
+        
+        #final-message {
+            font-size: 2em;
+            font-weight: bold;
+            color: #d32f2f;
+            margin-bottom: 10px;
+        }
+        
+        .clear-message {
+            color: #4CAF50 !important;
+        }
     </style>
 </head>
 <body>
@@ -121,14 +172,21 @@
     </div>
 
     <p id="game-status" style="margin-top: 20px; color: #333;">機嫌を100%にしよう！</p>
+    
+    <div id="overlay">
+        <h1 id="final-message">ピヨと仲良くなろう！</h1>
+        <p id="overlay-status">ボタンを押して、ピヨの要求に素早く応えよう。</p>
+        <button id="start-button">スタート！</button>
+        <button id="restart-button" style="display:none;">もう一度遊ぶ</button>
+    </div>
 </div>
 
 <script>
     // --- ゲーム設定 ---
-    const MAX_FAVORABILITY = 100; // 満タンに必要な機嫌
+    const MAX_FAVORABILITY = 100;
     const REQUIREMENT_INTERVAL = 3000; // 3秒ごとに要求を出す
-    const PENALTY_AMOUNT = -5; // 要求を無視した時の減少量
-    const REWARD_AMOUNT = 15; // 正しく対応した時の増加量
+    const PENALTY_AMOUNT = -5;
+    const REWARD_AMOUNT = 15;
     
     // 要求とその対応
     const REQUIREMENTS = {
@@ -136,6 +194,14 @@
         play: { message: 'かまって！', emoji: '' },
         sleep: { message: 'ねむねむ...', emoji: '' }
     };
+    
+    // 好感度に応じた表情（顔文字）
+    const EMOTIONS = [
+        { threshold: 80, face: '(*^-^*)' }, // 80%以上: とても機嫌が良い
+        { threshold: 50, face: '(^v^)' }, // 50%以上: 良い気分
+        { threshold: 20, face: '(-_-)' }, // 20%以上: 不満気
+        { threshold: 0, face: '(T_T)' } // 0%付近: 泣いている
+    ];
 
     // --- DOM要素 ---
     const gaugeBar = document.getElementById('gauge-bar');
@@ -144,16 +210,21 @@
     const actionButtons = document.querySelectorAll('#action-buttons button');
     const gameStatus = document.getElementById('game-status');
     const gameContainer = document.getElementById('game-container');
+    const overlay = document.getElementById('overlay');
+    const startButton = document.getElementById('start-button');
+    const restartButton = document.getElementById('restart-button');
+    const finalMessage = document.getElementById('final-message');
+    const overlayStatus = document.getElementById('overlay-status');
 
     // --- 変数 ---
-    let favorability = 50; // 初期機嫌
+    let favorability = 50;
     let currentRequirement = null;
     let gameInterval = null;
-    let isGameOver = false;
+    let isGameActive = false; // ゲームが進行中かを示すフラグ
 
     // --- 状態更新関数 ---
     function updateFavorability(delta) {
-        if (isGameOver) return;
+        if (!isGameActive) return;
 
         favorability += delta;
         
@@ -166,13 +237,17 @@
         gaugeBar.style.width = percent + '%';
         gaugeBar.textContent = percent + '%';
         
-        // --- 機嫌によるペットの表情変化 ---
-        if (percent >= 80) petDisplay.textContent = '';
-        else if (percent >= 50) petDisplay.textContent = '';
-        else if (percent >= 20) petDisplay.textContent = '';
-        else petDisplay.textContent = '';
+        // --- 機嫌によるペットの表情変化 (顔文字) ---
+        let currentFace = '';
+        for(const emotion of EMOTIONS) {
+            if (percent >= emotion.threshold) {
+                currentFace = emotion.face;
+                break;
+            }
+        }
+        petDisplay.textContent = currentFace;
 
-        // --- ゲームクリア判定 ---
+        // --- ゲームクリア/オーバー判定 ---
         if (favorability >= MAX_FAVORABILITY) {
             endGame('CLEAR');
         } else if (favorability <= 0) {
@@ -182,13 +257,15 @@
 
     // --- ランダムな要求を出す ---
     function issueRequirement() {
+        if (!isGameActive) return;
+        
         // 前の要求が残っていた場合、ペナルティ
         if (currentRequirement) {
             gameStatus.textContent = '要求を無視した！機嫌が下がった...';
             updateFavorability(PENALTY_AMOUNT);
         }
 
-        if (isGameOver) return;
+        if (!isGameActive) return;
 
         // 新しい要求をランダムに選択
         const keys = Object.keys(REQUIREMENTS);
@@ -197,8 +274,8 @@
         currentRequirement = randomKey;
         petRequest.textContent = REQUIREMENTS[randomKey].message;
         
-        // 要求時の特別な表情
-        petDisplay.textContent = REQUIREMENTS[randomKey].emoji;
+        // 要求時の特別な表情を一時的に表示 (要求に合った絵文字)
+        // 好感度に応じた顔文字は petDisplay に表示し続けるため、要求絵文字は使用しない
         
         // ボタンを有効化
         actionButtons.forEach(button => button.disabled = false);
@@ -206,7 +283,7 @@
 
     // --- プレイヤーの行動処理 ---
     function handleAction(action) {
-        if (isGameOver || !currentRequirement) return;
+        if (!isGameActive || !currentRequirement) return;
 
         // ボタンを押したら一旦全て無効化
         actionButtons.forEach(button => button.disabled = true);
@@ -228,45 +305,70 @@
 
     // --- ゲーム終了処理 ---
     function endGame(result) {
-        isGameOver = true;
+        isGameActive = false;
         clearInterval(gameInterval);
         petRequest.textContent = '';
         actionButtons.forEach(button => button.disabled = true);
 
+        // オーバーレイを表示
+        overlay.classList.remove('hidden');
+        startButton.style.display = 'none';
+        restartButton.style.display = 'inline-block';
+        
         if (result === 'CLEAR') {
-            gameStatus.textContent = 'ゲームクリア！最高の友達になった！';
+            finalMessage.textContent = 'ゲームクリア！最高の友達になった！';
+            finalMessage.classList.add('clear-message');
+            overlayStatus.textContent = 'おめでとう！ピヨはとても幸せそうです。';
             petDisplay.textContent = '';
             gameContainer.classList.add('completed');
         } else if (result === 'GAMEOVER') {
-            gameStatus.textContent = 'ゲームオーバー...ピヨはそっぽを向いた...';
+            finalMessage.textContent = 'ゲームオーバー...';
+            finalMessage.classList.remove('clear-message');
+            overlayStatus.textContent = 'ピヨの機嫌が0になってしまいました。もう一度頑張ろう！';
             petDisplay.textContent = '';
             gaugeBar.textContent = '0%';
         }
     }
 
-    // --- 初期化とゲーム開始 ---
-    function initGame() {
-        // ボタンにイベントリスナーを設定
-        actionButtons.forEach(button => {
-            button.addEventListener('click', () => {
-                handleAction(button.dataset.action);
-            });
-            button.disabled = false; // 初期化時は有効
-        });
+    // --- ゲームのリセットと開始 ---
+    function startGame() {
+        // 状態をリセット
+        favorability = 50;
+        isGameActive = true;
+        currentRequirement = null;
+        gameContainer.classList.remove('completed');
         
-        updateFavorability(0); // 最初のゲージ表示
-        gameStatus.textContent = 'ボタンを押してピヨの要求に応えよう！';
+        // 画面をリセット
+        overlay.classList.add('hidden');
+        gameStatus.textContent = '機嫌を100%にしよう！';
+        petRequest.textContent = '';
         
-        // 定期的に要求を出すタイマーを設定
-        // 最初の要求は少し遅らせる
-        setTimeout(() => {
-            issueRequirement();
-            gameInterval = setInterval(issueRequirement, REQUIREMENT_INTERVAL);
-        }, 1000); 
+        // ゲージと表情を初期化
+        updateFavorability(0); 
+        
+        // ボタンを有効化 (イベントリスナーは既に設定済み)
+        actionButtons.forEach(button => button.disabled = false);
+        
+        // タイマー開始
+        gameInterval = setInterval(issueRequirement, REQUIREMENT_INTERVAL);
+        // 最初の要求を出す
+        setTimeout(issueRequirement, 1000); 
     }
 
-    // ゲーム開始
-    initGame();
+    // --- イベントリスナー設定 ---
+    startButton.addEventListener('click', startGame);
+    restartButton.addEventListener('click', startGame);
+    
+    // 行動ボタンにイベントリスナーを設定
+    actionButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            handleAction(button.dataset.action);
+        });
+        button.disabled = true; // ゲーム開始前は無効化
+    });
+
+    // 初期表示として表情を一度更新
+    updateFavorability(0); 
 </script>
 
 </body>
