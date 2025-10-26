@@ -2,8 +2,8 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>Keep Shooting!</title> 
-    <style>
+    <title>Keep Shooting!</title> <style>
+        /* CSSは変更ありません */
         body { 
             margin: 0; 
             background-color: #0a0a0a; 
@@ -45,6 +45,7 @@
             font-size: 18px;
             margin: 5px 0;
         }
+        /* ★ 説明文用のスタイルを追加 */
         .game-overlay .description {
             font-size: 16px;
             margin-top: 15px;
@@ -117,7 +118,7 @@
 
     <script>
         // =========================================================
-        // 1. セットアップ
+        // JavaScript部分は前回のコードから変更ありません
         // =========================================================
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
@@ -146,9 +147,7 @@
         
         const GROUND_LEVEL = GAME_HEIGHT - 20;
 
-        // =========================================================
-        // 2. ★ プレイヤーのクラス定義 (二段ジャンプ ロジック修正)
-        // =========================================================
+        // --- Player Class ---
         class Player {
             constructor() {
                 this.x = 50; 
@@ -157,35 +156,32 @@
                 this.width = 10;  
                 this.headRadius = 6;
                 
-                this.vy = 0; // 垂直速度
+                this.vy = 0; 
                 this.gravity = 0.8;
-                this.jumpCount = 0;   // ★ ジャンプ回数カウンター
+                this.isJumping = false; 
+                this.jumpCount = 0;   
             }
 
             jump() {
-                // ★ 2回までジャンプ可能
                 if (this.jumpCount < 2) {
-                    this.vy = -16; // 毎回同じ力でジャンプ
+                    this.vy = -16; 
+                    this.isJumping = true; 
                     this.jumpCount++;
                     game.spawnEffect(this.x, this.y, 'jump'); 
                 }
             }
 
             update() {
-                // 1. 速度を適用
                 this.y += this.vy;
-
-                // 2. 地面にいなければ、常に重力をかける
-                // (y < GROUND_LEVEL のチェックで、地上でvyが無限に増えるのを防ぐ)
-                if (this.y < GROUND_LEVEL) {
-                     this.vy += this.gravity;
+                if (this.isJumping) {
+                    this.vy += this.gravity;
                 }
 
-                // 3. 地面との衝突判定 (着地)
                 if (this.y > GROUND_LEVEL) {
                     this.y = GROUND_LEVEL;
                     this.vy = 0;
-                    this.jumpCount = 0; // ★ 地面に着いたらリセット
+                    this.isJumping = false;
+                    this.jumpCount = 0; 
                 }
             }
 
@@ -216,9 +212,7 @@
             }
         }
 
-        // =========================================================
-        // 3. エフェクトのクラス定義
-        // =========================================================
+        // --- Effect Class ---
         class Effect {
             constructor(x, y, type) {
                 this.x = x;
@@ -248,9 +242,7 @@
             }
         }
         
-        // =========================================================
-        // 4. 障害物 (Obstacle) のクラス定義
-        // =========================================================
+        // --- Obstacle Class ---
         class Obstacle {
             constructor(x, y, size, speed) {
                 this.x = x;
@@ -269,9 +261,7 @@
             }
         }
         
-        // =========================================================
-        // 5. 的 (Target) のクラス定義
-        // =========================================================
+        // --- Target Class ---
         class Target {
             constructor(x, y, size, speed, isBonus) {
                 this.x = x; 
@@ -319,9 +309,7 @@
             }
         }
         
-        // =========================================================
-        // 6. 弾丸 (Projectile) のクラス定義
-        // =========================================================
+        // --- Projectile Class ---
         class Projectile {
             constructor(x, y) {
                 this.x = x;
@@ -341,9 +329,7 @@
             }
         }
 
-        // =========================================================
-        // 7. ゲーム管理オブジェクト
-        // =========================================================
+        // --- Game Object ---
         const game = {
             player: null,
             effects: [],
@@ -433,9 +419,7 @@
             }
         };
 
-        // =========================================================
-        // 8. ゲーム開始関数
-        // =========================================================
+        // --- Start Game Function ---
         function startGame() {
             if (gameLoopId) cancelAnimationFrame(gameLoopId);
             
@@ -456,9 +440,7 @@
             gameLoop(0); 
         }
 
-        // =========================================================
-        // 9. ゲームオーバー関数
-        // =========================================================
+        // --- End Game Function ---
         function endGame() {
             game.gameOver = true;
             if (gameLoopId) cancelAnimationFrame(gameLoopId);
@@ -467,9 +449,7 @@
             gameOverScreen.style.display = 'flex'; 
         }
 
-        // =========================================================
-        // 10. メインゲームループ
-        // =========================================================
+        // --- Main Game Loop ---
         function gameLoop(timestamp) {
             if (game.gameOver) return;
             
@@ -512,7 +492,7 @@
             game.effects.forEach(e => e.draw());
             game.projectiles.forEach(p => p.draw());
             game.obstacles.forEach(o => o.draw());
-Services.targets.forEach(t => t.draw()); 
+            game.targets.forEach(t => t.draw()); 
 
             // Collisions
             game.obstacles.forEach(obstacle => {
@@ -550,10 +530,7 @@ Services.targets.forEach(t => t.draw());
             });
         }
 
-        // =========================================================
-        // 11. イベントリスナー
-        // =========================================================
-        
+        // --- Event Listeners ---
         startButton.addEventListener('click', startGame);
         restartButton.addEventListener('click', startGame);
 
