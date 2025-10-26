@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>スタイリッシュ・スクロールゲーム</title>
+    <style>
+        body { margin: 0; background-color: #111; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        #gameCanvas { border: 2px solid #555; background-color: #000; }
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas" width="800" height="400"></canvas>
+
+    <script>
+        // =========================================================
+        // 1. セットアップ
+        // =========================================================
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const GAME_WIDTH = canvas.width;
+        const GAME_HEIGHT = canvas.height;
+
+        let lastTime = 0; 
+
+        // =========================================================
+        // 2. プレイヤーのクラス定義 (変更なし)
+        // =========================================================
+        class Player {
+            constructor() {
+                this.x = 50;
+                this.y = GAME_HEIGHT - 50; // 地面の上
+                this.size = 20;
+                this.vy = 0; // 垂直速度
+                this.gravity = 0.8;
+                this.isJumping = false;
+            }
+
+            jump() {
+                if (!this.isJumping) {
+                    this.vy = -15; 
+                    this.isJumping = true;
+                    game.spawnEffect(this.x + this.size / 2, this.y, 'jump'); 
+                }
+            }
+
+            update() {
+                this.y += this.vy;
+                if (this.isJumping) {
+                    this.vy += this.gravity;
+                }
+
+                const groundY = GAME_HEIGHT - this.size;
+                if (this.y > groundY) {
+                    this.y = groundY;
+                    this.vy = 0;
+                    this.isJumping = false;
+                }
+            }
+
+            draw() {
+                ctx.fillStyle = 'cyan';
+                ctx.fillRect(this.x, this.y - this.size, this.size, this.size);
+            }
+        }
+
+        // =========================================================
+        // 3. エフェクトのクラス定義 (変更なし)
+        // =========================================================
+        class Effect {
+            constructor(x, y, type) {
+                this.x = x;
+                this.y = y;
+                this.type = type;
+                this.radius = 5;
+                this.maxRadius = 50;
+                this.opacity = 1.0;
+                this.speed = 2;
+                this.isDone = false;
+                
+                // タイプによって色を変更
+                if (type === 'jump') {
+                    this.color = 'rgba(0, 255, 255,'; // ジャンプ: シアン
+                } else if (type === 'shoot') {
+                    this.color = 'rgba(255, 255, 100,'; // 射撃: 黄色
+                } else {
+                    this.color = 'rgba(255, 100, 100,'; // 破壊: 赤
+                }
+            }
+
+            update() {
+                this.radius += this.speed;
+                this.opacity -= 0.03;
+
+                if (this.opacity <= 0 || this.radius > this.maxRadius) {
+                    this.isDone = true;
+                }
+            }
+
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.strokeStyle = this.color + this.opacity + ')';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+            }
+        }
+        
+        // =========================================================
+        // 4. ★ 障害物 (Obstacle) のクラス定義 (新規追加)
+        // =========================================================
+        class Obstacle {
+            constructor(x, y, size, speed, color) {
+                this.x = x;
+                this.y = y;
+                this.size = size;
+                this.speed = speed;
+                this.color = color;
+                this.isDone = false; // 弾丸に当たったか
+            }
+            
+            update() {
+                // 左にスクロール
+                this.x -= this.speed;
+            }
+            
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.fillRect(this.x, this.y - this.size, this.size, this.size);
+            }
+        }
+        
+        // =========================================================
+        // 5. ★ 弾丸 (Projectile) のクラス定義 (新規追加)
+        // =========================================================
+        class Projectile {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.size = 5;
+                this.speed = 10;
+                this.color = 'gold';
+                this.isDone = false; // 障害物に当たったか
+            }
+            
+            update() {
+                this.x += this.speed;
+            }
+            
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.fillRect(this.x, this.y, this.size * 2, this.size);
+            }
+        }
+
+        // =========================================================
+        // 6. ゲーム管理オブジェクト (大幅拡張)
+        // =========================================================
+        const game = {
+            player: new Player(),
+            effects: [],
+            projectiles: [],
+            obstacles: [], // 障害物リスト
+            scrollSpeed: 4, // 基本のスクロール速度
+            
+            obstacleTimer: 0,
+            obstacleInterval: 120, // 障害物を生成する間隔 (フレーム数)
+            
+            score: 0,
+            gameOver: false,
+
+            spawnEffect(x, y, type) {
+                this.effects.push(new Effect(x, y, type));
+            },
+            
+            shoot() {
+                const pX = this.player.x + this.player.size;
+                const pY = this.player.y - (this.player.size / 2);
+                this.projectiles.push(new Projectile(pX, pY));
+                this.spawnEffect(pX, pY, 'shoot');
+            },
+            
+            // 障害物を生成する
+            spawnObstacle() {
+                const size = Math.random() * 30 + 20; // 20〜50pxのランダムなサイズ
+                const speed = this.scrollSpeed + Math.random() * 2; // スピードも少しランダムに
+                
+                this.obstacles.push(new Obstacle(
+                    GAME_WIDTH + size, // 画面右端から出現
+                    GAME_HEIGHT - size, // 地面上
+                    size, 
+                    speed, 
+                    '#f55' // 赤色
+                ));
+            },
+            
+            // 衝突判定 (AABB: 軸並行境界ボックス)
+            checkCollision(rect1, rect2) {
+                // プレイヤーは y座標が「足元」基準なので、当たり判定を調整
+                const playerTop = rect1.y - rect1.size;
+                const playerBottom = rect1.y;
+                // 障害物も y座標が「足元」基準
+                const obsTop = rect2.y - rect2.size;
+                const obsBottom = rect2.y;
+
+                return (
+                    rect1.x < rect2.x + rect2.size &&
+                    rect1.x + rect1.size > rect2.x &&
+                    playerTop < obsBottom &&
+                    playerBottom > obsTop
+                );
+            }
+        };
+
+        // =========================================================
+        // 7. メインゲームループ (大幅拡張)
+        // =========================================================
+        function gameLoop(timestamp) {
+            const deltaTime = timestamp - lastTime;
+            lastTime = timestamp;
+
+            // 画面クリア
+            ctx.clearRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+
+            // 地面の描画
+            ctx.fillStyle = '#222';
+            ctx.fillRect(0, GAME_HEIGHT - 20, GAME_WIDTH, 20); 
+
+            // スコア表示
+            ctx.fillStyle = 'white';
+            ctx.font = '20px sans-serif';
+            ctx.fillText(`Score: ${game.score}`, 10, 30);
+
+            // --- ゲームオーバー処理 ---
+            if (game.gameOver) {
+                ctx.fillStyle = 'red';
+                ctx.font = '50px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('GAME OVER', GAME_WIDTH / 2, GAME_HEIGHT / 2);
+                requestAnimationFrame(gameLoop); // ループは続けるが更新はしない
+                return; // これ以降の更新処理をスキップ
+            }
+
+            // --- 更新処理 ---
+
+            // プレイヤー
+            game.player.update();
+            game.player.draw();
+
+            // エフェクト
+            game.effects.forEach(e => e.update());
+            game.effects.forEach(e => e.draw());
+            game.effects = game.effects.filter(e => !e.isDone);
+
+            // 弾丸
+            game.projectiles.forEach(p => p.update());
+            game.projectiles.forEach(p => p.draw());
+            // 画面外に出た弾丸を削除
+            game.projectiles = game.projectiles.filter(p => p.x < GAME_WIDTH && !p.isDone);
+            
+            // 障害物の生成タイマー
+            game.obstacleTimer++;
+            if (game.obstacleTimer % game.obstacleInterval === 0) {
+                game.spawnObstacle();
+            }
+            
+            // 障害物
+            game.obstacles.forEach(o => o.update());
+            game.obstacles.forEach(o => o.draw());
+            // 画面外に出た障害物を削除
+            game.obstacles = game.obstacles.filter(o => o.x + o.size > 0 && !o.isDone);
+
+            // --- 衝突判定 ---
+
+            // 1. プレイヤー vs 障害物
+            game.obstacles.forEach(obstacle => {
+                if (game.checkCollision(game.player, obstacle)) {
+                    game.gameOver = true;
+                    game.spawnEffect(game.player.x, game.player.y, 'destroy');
+                }
+            });
+            
+            // 2. 弾丸 vs 障害物 (二重ループ)
+            game.projectiles.forEach(projectile => {
+                game.obstacles.forEach(obstacle => {
+                    // 弾丸と障害物の当たり判定
+                    if (game.checkCollision(projectile, obstacle)) {
+                        projectile.isDone = true; // 弾丸を消す
+                        obstacle.isDone = true; // 障害物を消す
+                        game.score += 100; // スコア加算
+                        
+                        // 破壊エフェクト
+                        game.spawnEffect(obstacle.x + obstacle.size / 2, obstacle.y - obstacle.size / 2, 'destroy');
+                    }
+                });
+            });
+
+            // 次のフレームを要求
+            requestAnimationFrame(gameLoop);
+        }
+
+        // =========================================================
+        // 8. キーボード入力のイベントリスナー
+        // =========================================================
+        window.addEventListener('keydown', (e) => {
+            // ゲームオーバー中は操作不可
+            if (game.gameOver) {
+                // (リスタート処理などをここに追加できる)
+                return;
+            }
+            
+            switch (e.code) {
+                case 'Space': 
+                    game.player.jump();
+                    break;
+                case 'ShiftLeft': 
+                case 'Enter': 
+                    game.shoot();
+                    break;
+            }
+        });
+
+        // ゲーム開始
+        gameLoop(0);
+
+    </script>
+
+</body>
+</html>
