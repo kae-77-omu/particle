@@ -6,7 +6,7 @@
     <style>
         body { 
             margin: 0; 
-            background-color: #0a0a0a; /* 暗い背景 */
+            background-color: #0a0a0a; 
             display: flex; 
             justify-content: center; 
             align-items: center; 
@@ -17,7 +17,7 @@
             position: relative;
         }
         #gameCanvas { 
-            border: 2px solid #00FFFF; /* ネオン（シアン）の枠 */
+            border: 2px solid #00FFFF; 
             background-color: #000;
             display: block; 
         }
@@ -28,13 +28,12 @@
             width: 800px;
             height: 400px;
             background-color: rgba(0, 0, 0, 0.8);
-            color: #FFFFFF; /* テキストは白 */
-            
+            color: #FFFFFF; 
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            text-shadow: 0 0 5px #FFFFFF; /* テキストを光らせる */
+            text-shadow: 0 0 5px #FFFFFF; 
         }
         .game-overlay h1 {
             font-size: 40px;
@@ -51,8 +50,6 @@
             padding: 10px 20px;
             margin-top: 25px;
             cursor: pointer;
-            
-            /* ネオン風ボタン */
             background-color: #000;
             border: 2px solid #00FFFF;
             color: #00FFFF;
@@ -69,7 +66,7 @@
             display: none;
         }
         #game-over-screen h1 {
-            color: #F000FF; /* ゲームオーバーはマゼンタ */
+            color: #F000FF; 
             text-shadow: 0 0 10px #F000FF;
         }
         #game-over-screen button {
@@ -91,7 +88,7 @@
         
         <div id="start-screen" class="game-overlay">
             <h1>NEON RUNNER</h1>
-            <p>スペースキー：ジャンプ</p>
+            <p>スペースキー：ジャンプ (2段ジャンプ可)</p>
             <p>右矢印キー：撃つ</p>
             <button id="start-button">スタート</button>
         </div>
@@ -112,19 +109,19 @@
         const GAME_WIDTH = canvas.width;
         const GAME_HEIGHT = canvas.height;
 
-        // ★ ネオンカラーのパレット
         const colors = {
-            PLAYER: '#00FFFF',      // シアン
-            GROUND: '#F000FF',      // マゼンタ
-            TARGET: '#FFFF00',      // 黄色
-            PROJECTILE: '#FFFFFF',  // 白
-            TEXT: '#FFFFFF',        // 白
-            FX_JUMP: 'rgba(0, 255, 255,', // ジャンプエフェクト
-            FX_DESTROY: 'rgba(255, 100, 100,' // 破壊エフェクト
+            PLAYER: '#00FFFF',      
+            GROUND: '#F000FF',      
+            TARGET: '#FFFF00',      
+            TARGET_BONUS: '#F000FF', // ★ ボーナス的の色 (マゼンタ)
+            PROJECTILE: '#FFFFFF',  
+            TEXT: '#FFFFFF',        
+            FX_JUMP: 'rgba(0, 255, 255,', 
+            FX_DESTROY: 'rgba(255, 100, 100,' 
         };
         
         let lastTime = 0; 
-        let gameLoopId = 0; // ループのIDを管理
+        let gameLoopId = 0; 
         
         const startScreen = document.getElementById('start-screen');
         const gameOverScreen = document.getElementById('game-over-screen');
@@ -132,28 +129,31 @@
         const restartButton = document.getElementById('restart-button');
         const finalScoreEl = document.getElementById('final-score');
         
-        const GROUND_LEVEL = GAME_HEIGHT - 20; // 地面のY座標
+        const GROUND_LEVEL = GAME_HEIGHT - 20;
 
         // =========================================================
-        // 2. ★ プレイヤーのクラス定義 (人型に変更)
+        // 2. ★ プレイヤーのクラス定義 (二段ジャンプ対応)
         // =========================================================
         class Player {
             constructor() {
-                this.x = 50; // 棒人間の中心X
-                this.y = GROUND_LEVEL; // 足元のY
-                this.height = 30; // 胴体の高さ
-                this.width = 10;  // 胴体の幅（当たり判定用）
+                this.x = 50; 
+                this.y = GROUND_LEVEL; 
+                this.height = 30; 
+                this.width = 10;  
                 this.headRadius = 6;
                 
                 this.vy = 0; 
                 this.gravity = 0.8;
-                this.isJumping = false;
+                this.isJumping = false; // 地面にいるか否か
+                this.jumpCount = 0;   // ★ ジャンプ回数カウンター
             }
 
             jump() {
-                if (!this.isJumping) {
-                    this.vy = -16; // ジャンプ力
-                    this.isJumping = true;
+                // ★ 2回までジャンプ可能
+                if (this.jumpCount < 2) {
+                    this.vy = -16; // 1回目も2回目も同じジャンプ力
+                    this.isJumping = true; // ジャンプ中に設定
+                    this.jumpCount++;
                     game.spawnEffect(this.x, this.y, 'jump'); 
                 }
             }
@@ -168,6 +168,7 @@
                     this.y = GROUND_LEVEL;
                     this.vy = 0;
                     this.isJumping = false;
+                    this.jumpCount = 0; // ★ 地面に着いたらリセット
                 }
             }
 
@@ -178,31 +179,28 @@
                 const bodyTop = this.y - this.height;
                 const headCenterY = bodyTop - this.headRadius;
                 
-                // Head
                 ctx.beginPath();
                 ctx.arc(this.x, headCenterY, this.headRadius, 0, Math.PI * 2);
                 ctx.stroke();
                 
-                // Body
                 ctx.beginPath();
                 ctx.moveTo(this.x, bodyTop);
-                ctx.lineTo(this.x, this.y - 10); // 胴体
+                ctx.lineTo(this.x, this.y - 10); 
                 ctx.stroke();
                 
-                // Legs
                 ctx.beginPath();
                 ctx.moveTo(this.x, this.y - 10);
-                ctx.lineTo(this.x - 6, this.y); // 左足
+                ctx.lineTo(this.x - 6, this.y); 
                 ctx.stroke();
                 ctx.beginPath();
                 ctx.moveTo(this.x, this.y - 10);
-                ctx.lineTo(this.x + 6, this.y); // 右足
+                ctx.lineTo(this.x + 6, this.y); 
                 ctx.stroke();
             }
         }
 
         // =========================================================
-        // 3. エフェクトのクラス定義
+        // 3. エフェクトのクラス定義 (変更なし)
         // =========================================================
         class Effect {
             constructor(x, y, type) {
@@ -234,15 +232,15 @@
         }
         
         // =========================================================
-        // 4. 障害物 (Obstacle) のクラス定義
+        // 4. 障害物 (Obstacle) のクラス定義 (変更なし)
         // =========================================================
         class Obstacle {
             constructor(x, y, size, speed) {
                 this.x = x;
-                this.y = y; // 底辺のY
+                this.y = y; 
                 this.size = size;
                 this.speed = speed;
-                this.color = colors.GROUND; // 地面と同じ色
+                this.color = colors.GROUND; 
                 this.isDone = false; 
             }
             
@@ -255,15 +253,16 @@
         }
         
         // =========================================================
-        // 5. ★ 的 (Target) のクラス定義 (魚型に変更)
+        // 5. ★ 的 (Target) のクラス定義 (向き反転・ボーナス対応)
         // =========================================================
         class Target {
-            constructor(x, y, size, speed) {
+            constructor(x, y, size, speed, isBonus) {
                 this.x = x; // 魚の「鼻先」のX
                 this.y = y; // 魚の「底辺」のY
                 this.size = size; // 魚の「体長」
                 this.speed = speed;
-                this.color = colors.TARGET;
+                this.isBonus = isBonus; // ★ ボーナスフラグ
+                this.color = isBonus ? colors.TARGET_BONUS : colors.TARGET;
                 this.isDone = false;
             }
             
@@ -272,34 +271,44 @@
             draw() {
                 ctx.fillStyle = this.color;
                 
+                // ★ ボーナス的は光らせる
+                if (this.isBonus) {
+                    ctx.shadowColor = this.color;
+                    ctx.shadowBlur = 10;
+                }
+                
+                // ★ 魚の頭が右 (this.x) を向くように修正
                 const w = this.size; // 体長 20
                 const h = this.size * 0.8; // 体高 16
                 const tailSize = w * 0.6; // 尾の大きさ 12
                 
-                const bodyBackX = this.x - w;
+                const bodyBackX = this.x + w;
                 const bodyTopY = this.y - h;
                 const bodyCenterY = this.y - h / 2;
 
                 // Body (三角形)
                 ctx.beginPath();
-                ctx.moveTo(this.x, bodyCenterY); // 鼻先
-                ctx.lineTo(bodyBackX, bodyTopY); // 背中
-                ctx.lineTo(bodyBackX, this.y);   // お腹
+                ctx.moveTo(this.x, bodyCenterY); // 鼻先 (右)
+                ctx.lineTo(bodyBackX, bodyTopY); // 背中 (左上)
+                ctx.lineTo(bodyBackX, this.y);   // お腹 (左下)
                 ctx.closePath();
                 ctx.fill();
                 
                 // Tail (三角形)
                 ctx.beginPath();
-                ctx.moveTo(bodyBackX, bodyCenterY); // 尾の付け根
-                ctx.lineTo(bodyBackX - tailSize, bodyTopY - tailSize * 0.5); // 尾の上
-                ctx.lineTo(bodyBackX - tailSize, this.y + tailSize * 0.5);   // 尾の下
+                ctx.moveTo(bodyBackX, bodyCenterY); // 尾の付け根 (左)
+                ctx.lineTo(bodyBackX + tailSize, bodyTopY - tailSize * 0.5); // 尾の上
+                ctx.lineTo(bodyBackX + tailSize, this.y + tailSize * 0.5);   // 尾の下
                 ctx.closePath();
                 ctx.fill();
+                
+                // 影をリセット
+                ctx.shadowBlur = 0;
             }
         }
         
         // =========================================================
-        // 6. 弾丸 (Projectile) のクラス定義
+        // 6. 弾丸 (Projectile) のクラス定義 (変更なし)
         // =========================================================
         class Projectile {
             constructor(x, y) {
@@ -344,7 +353,6 @@
             spawnEffect(x, y, type) { this.effects.push(new Effect(x, y, type)); },
             
             shoot() {
-                // 棒人間の胸のあたりから発射
                 const pX = this.player.x + 5;
                 const pY = this.player.y - this.player.height / 2;
                 this.projectiles.push(new Projectile(pX, pY));
@@ -352,34 +360,36 @@
             },
             
             spawnObstacle() {
-                const size = Math.random() * 40 + 20; // 20〜60px
+                const size = Math.random() * 40 + 20; 
                 this.obstacles.push(new Obstacle(
                     GAME_WIDTH + size, 
-                    GROUND_LEVEL, // 地面から
+                    GROUND_LEVEL, 
                     size, 
                     this.scrollSpeed
                 ));
             },
             
             spawnTarget() {
-                const size = 20; // 魚のサイズ
+                const size = 20; 
+                // ★ 20%の確率でボーナス的を生成
+                const isBonus = Math.random() < 0.2; 
+                
                 this.targets.push(new Target(
                     GAME_WIDTH + size,
-                    GROUND_LEVEL - 80 - (Math.random() * 100), // 空中
+                    GROUND_LEVEL - 80 - (Math.random() * 100), 
                     size,
-                    this.scrollSpeed + 3 // 少し速く
+                    this.scrollSpeed + 3,
+                    isBonus // ★ ボーナスフラグを渡す
                 ));
             },
             
-            // ★ プレイヤーと障害物/的の衝突判定 (形状に合わせて調整)
+            // プレイヤーと障害物/的の衝突判定
             checkPlayerCollision(player, obj) {
-                // プレイヤーの当たり判定 (棒人間)
                 const playerLeft = player.x - (player.width / 2);
                 const playerRight = player.x + (player.width / 2);
                 const playerTop = player.y - player.height - (player.headRadius * 2);
                 const playerBottom = player.y;
 
-                // 障害物の当たり判定
                 const objLeft = obj.x;
                 const objRight = obj.x + obj.size;
                 const objTop = obj.y - obj.size;
@@ -393,7 +403,7 @@
                 );
             },
             
-            // ★ 弾丸と的の衝突判定 (形状に合わせて調整)
+            // ★ 弾丸と的の衝突判定 (魚の向きに合わせて修正)
             checkRectCollision(proj, target) {
                 const projLeft = proj.x;
                 const projRight = proj.x + proj.width;
@@ -403,11 +413,12 @@
                 // 魚(Target)の当たり判定
                 const targetWidth = target.size * 1.6; // 尾びれも含む
                 const targetHeight = target.size;
-                const targetLeft = target.x - targetWidth;
-                const targetRight = target.x;
+                const targetLeft = target.x; // 鼻先 (右)
+                const targetRight = target.x + targetWidth; // 尾びれ (左)
                 const targetTop = target.y - targetHeight;
                 const targetBottom = target.y;
 
+                // ★ 向きが変わったので衝突判定を修正
                 return (
                     projLeft < targetRight && projRight > targetLeft &&
                     projTop < targetBottom && projBottom > targetTop
@@ -416,10 +427,9 @@
         };
 
         // =========================================================
-        // 8. ゲーム開始関数
+        // 8. ゲーム開始関数 (変更なし)
         // =========================================================
         function startGame() {
-            // ループが動いていたら止める (リスタート時に備える)
             if (gameLoopId) cancelAnimationFrame(gameLoopId);
             
             game.player = new Player();
@@ -440,11 +450,10 @@
         }
 
         // =========================================================
-        // 9. ゲームオーバー関数
+        // 9. ゲームオーバー関数 (変更なし)
         // =========================================================
         function endGame() {
             game.gameOver = true;
-            // ループを停止
             if (gameLoopId) cancelAnimationFrame(gameLoopId);
             
             finalScoreEl.textContent = game.score; 
@@ -455,17 +464,16 @@
         // 10. メインゲームループ
         // =========================================================
         function gameLoop(timestamp) {
-            // ゲームオーバーならループを停止
             if (game.gameOver) return;
             
-            gameLoopId = requestAnimationFrame(gameLoop); // 次のフレームを予約
+            gameLoopId = requestAnimationFrame(gameLoop); 
 
             const deltaTime = timestamp - lastTime;
             lastTime = timestamp;
 
             ctx.clearRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
 
-            // 地面 (ネオンの線)
+            // 地面
             ctx.fillStyle = colors.GROUND;
             ctx.fillRect(0, GROUND_LEVEL, GAME_WIDTH, 2); 
 
@@ -475,7 +483,7 @@
             ctx.shadowColor = colors.TEXT;
             ctx.shadowBlur = 5;
             ctx.fillText(`Score: ${game.score}`, 10, 30);
-            ctx.shadowBlur = 0; // 影をリセット
+            ctx.shadowBlur = 0; 
 
             // --- 更新処理 ---
             game.player.update();
@@ -494,7 +502,7 @@
             game.targetTimer++;
             if (game.targetTimer % game.targetInterval === 0) game.spawnTarget();
             game.targets.forEach(t => t.update());
-            game.targets = game.targets.filter(t => t.x + (t.size * 1.6) > 0 && !t.isDone); // 尾びれが消えるまで
+            game.targets = game.targets.filter(t => t.x + (t.size * 1.6) > 0 && !t.isDone); 
 
             // --- 描画処理 ---
             game.player.draw();
@@ -514,29 +522,39 @@
             
             // 2. プレイヤー vs 的
             game.targets.forEach(target => {
-                if (game.checkPlayerCollision(game.player, target)) {
+                // ★ 魚の当たり判定（向き修正）
+                const targetHitbox = {
+                    x: target.x, // 右端
+                    y: target.y, // 底辺
+                    size: target.size * 1.6 // 全長
+                };
+                if (game.checkPlayerCollision(game.player, targetHitbox)) {
                     endGame(); 
                 }
             });
             
-            // 3. ★ 弾丸 vs 障害物 (削除済み)
-            // 障害物は破壊されません
-
-            // 4. 弾丸 vs 的
+            // 3. 弾丸 vs 的
             game.projectiles.forEach(projectile => {
                 game.targets.forEach(target => {
                     if (!projectile.isDone && !target.isDone && game.checkRectCollision(projectile, target)) {
                         projectile.isDone = true;
                         target.isDone = true;
-                        game.score += 200; 
-                        game.spawnEffect(target.x - target.size / 2, target.y - target.size / 2, 'destroy');
+                        
+                        // ★ スコア分岐
+                        if (target.isBonus) {
+                            game.score += 300; // 1.5倍
+                        } else {
+                            game.score += 200; // 通常
+                        }
+                        
+                        game.spawnEffect(target.x + target.size / 2, target.y - target.size / 2, 'destroy');
                     }
                 });
             });
         }
 
         // =========================================================
-        // 11. イベントリスナー
+        // 11. イベントリスナー (変更なし)
         // =========================================================
         
         startButton.addEventListener('click', startGame);
@@ -547,7 +565,7 @@
             
             switch (e.code) {
                 case 'Space': 
-                    e.preventDefault(); // 画面スクロールを防ぐ
+                    e.preventDefault(); 
                     game.player.jump();
                     break;
                 case 'ArrowRight': 
