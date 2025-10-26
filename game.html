@@ -4,13 +4,80 @@
     <meta charset="UTF-8">
     <title>スタイリッシュ・スクロールゲーム</title>
     <style>
-        body { margin: 0; background-color: #111; display: flex; justify-content: center; align-items: center; height: 100vh; }
-        #gameCanvas { border: 2px solid #555; background-color: #000; }
+        body { 
+            margin: 0; 
+            background-color: #111; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            height: 100vh;
+        }
+        /* ゲームコンテナ：CanvasとUIを重ねるため */
+        #game-container {
+            position: relative;
+        }
+        #gameCanvas { 
+            border: 2px solid #555; 
+            background-color: #000;
+            display: block; /* 内部の余白を消す */
+        }
+        /* スタート・ゲームオーバー画面の共通スタイル */
+        .game-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 800px;
+            height: 400px;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            font-family: sans-serif;
+            
+            /* 中央揃え */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        .game-overlay h1 {
+            font-size: 40px;
+            margin-bottom: 20px;
+        }
+        .game-overlay p {
+            font-size: 18px;
+            margin: 5px 0;
+        }
+        .game-overlay button {
+            font-size: 20px;
+            padding: 10px 20px;
+            margin-top: 25px;
+            cursor: pointer;
+        }
+        
+        /* ゲームオーバー画面は最初は非表示 */
+        #game-over-screen {
+            display: none;
+        }
+
     </style>
 </head>
 <body>
 
-    <canvas id="gameCanvas" width="800" height="400"></canvas>
+    <div id="game-container">
+        <canvas id="gameCanvas" width="800" height="400"></canvas>
+        
+        <div id="start-screen" class="game-overlay">
+            <h1>スクロールゲーム</h1>
+            <p>スペースキー：ジャンプ</p>
+            <p>右矢印キー：撃つ</p>
+            <button id="start-button">スタート</button>
+        </div>
+
+        <div id="game-over-screen" class="game-overlay">
+            <h1>GAME OVER</h1>
+            <p>スコア: <span id="final-score">0</span></p>
+            <button id="restart-button">もう一度遊ぶ</button>
+        </div>
+    </div>
 
     <script>
         // =========================================================
@@ -22,16 +89,23 @@
         const GAME_HEIGHT = canvas.height;
 
         let lastTime = 0; 
+        
+        // UI要素
+        const startScreen = document.getElementById('start-screen');
+        const gameOverScreen = document.getElementById('game-over-screen');
+        const startButton = document.getElementById('start-button');
+        const restartButton = document.getElementById('restart-button');
+        const finalScoreEl = document.getElementById('final-score');
 
         // =========================================================
-        // 2. プレイヤーのクラス定義 (変更なし)
+        // 2. プレイヤーのクラス定義
         // =========================================================
         class Player {
             constructor() {
                 this.x = 50;
                 this.y = GAME_HEIGHT - 50; // 地面の上
                 this.size = 20;
-                this.vy = 0; // 垂直速度
+                this.vy = 0; 
                 this.gravity = 0.8;
                 this.isJumping = false;
             }
@@ -65,36 +139,27 @@
         }
 
         // =========================================================
-        // 3. エフェクトのクラス定義 (変更なし)
+        // 3. エフェクトのクラス定義
         // =========================================================
         class Effect {
             constructor(x, y, type) {
                 this.x = x;
                 this.y = y;
-                this.type = type;
                 this.radius = 5;
                 this.maxRadius = 50;
                 this.opacity = 1.0;
                 this.speed = 2;
                 this.isDone = false;
                 
-                // タイプによって色を変更
-                if (type === 'jump') {
-                    this.color = 'rgba(0, 255, 255,'; // ジャンプ: シアン
-                } else if (type === 'shoot') {
-                    this.color = 'rgba(255, 255, 100,'; // 射撃: 黄色
-                } else {
-                    this.color = 'rgba(255, 100, 100,'; // 破壊: 赤
-                }
+                if (type === 'jump') this.color = 'rgba(0, 255, 255,'; // ジャンプ: シアン
+                else if (type === 'shoot') this.color = 'rgba(255, 255, 100,'; // 射撃: 黄色
+                else this.color = 'rgba(255, 100, 100,'; // 破壊: 赤
             }
 
             update() {
                 this.radius += this.speed;
                 this.opacity -= 0.03;
-
-                if (this.opacity <= 0 || this.radius > this.maxRadius) {
-                    this.isDone = true;
-                }
+                if (this.opacity <= 0 || this.radius > this.maxRadius) this.isDone = true;
             }
 
             draw() {
@@ -107,7 +172,7 @@
         }
         
         // =========================================================
-        // 4. ★ 障害物 (Obstacle) のクラス定義 (新規追加)
+        // 4. 障害物 (Obstacle) のクラス定義
         // =========================================================
         class Obstacle {
             constructor(x, y, size, speed, color) {
@@ -116,13 +181,10 @@
                 this.size = size;
                 this.speed = speed;
                 this.color = color;
-                this.isDone = false; // 弾丸に当たったか
+                this.isDone = false; 
             }
             
-            update() {
-                // 左にスクロール
-                this.x -= this.speed;
-            }
+            update() { this.x -= this.speed; }
             
             draw() {
                 ctx.fillStyle = this.color;
@@ -131,47 +193,73 @@
         }
         
         // =========================================================
-        // 5. ★ 弾丸 (Projectile) のクラス定義 (新規追加)
+        // 5. ★ 的 (Target) のクラス定義 (新規追加)
+        // =========================================================
+        class Target {
+            constructor(x, y, size, speed, color) {
+                this.x = x;
+                this.y = y;
+                this.size = size;
+                this.speed = speed;
+                this.color = color;
+                this.isDone = false;
+            }
+            
+            update() { this.x -= this.speed; }
+            
+            draw() {
+                // 円形の的にする
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x + this.size / 2, this.y - this.size / 2, this.size / 2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+        
+        // =========================================================
+        // 6. ★ 弾丸 (Projectile) のクラス定義 (形状変更)
         // =========================================================
         class Projectile {
             constructor(x, y) {
                 this.x = x;
                 this.y = y;
-                this.size = 5;
+                this.width = 15; // 細長い形状
+                this.height = 3;  // 細長い形状
                 this.speed = 10;
                 this.color = 'gold';
-                this.isDone = false; // 障害物に当たったか
+                this.isDone = false; 
             }
             
-            update() {
-                this.x += this.speed;
-            }
+            update() { this.x += this.speed; }
             
             draw() {
                 ctx.fillStyle = this.color;
-                ctx.fillRect(this.x, this.y, this.size * 2, this.size);
+                ctx.fillRect(this.x, this.y, this.width, this.height);
             }
         }
 
         // =========================================================
-        // 6. ゲーム管理オブジェクト (大幅拡張)
+        // 7. ゲーム管理オブジェクト
         // =========================================================
         const game = {
-            player: new Player(),
+            player: null,
             effects: [],
             projectiles: [],
-            obstacles: [], // 障害物リスト
-            scrollSpeed: 4, // 基本のスクロール速度
+            obstacles: [],
+            targets: [], // ★ 的リスト
+            
+            scrollSpeed: 4,
             
             obstacleTimer: 0,
-            obstacleInterval: 120, // 障害物を生成する間隔 (フレーム数)
+            obstacleInterval: 120, 
+            
+            targetTimer: 0,
+            targetInterval: 100, // ★ 的の出現間隔
             
             score: 0,
             gameOver: false,
 
-            spawnEffect(x, y, type) {
-                this.effects.push(new Effect(x, y, type));
-            },
+            spawnEffect(x, y, type) { this.effects.push(new Effect(x, y, type)); },
             
             shoot() {
                 const pX = this.player.x + this.player.size;
@@ -180,117 +268,181 @@
                 this.spawnEffect(pX, pY, 'shoot');
             },
             
-            // 障害物を生成する
             spawnObstacle() {
-                const size = Math.random() * 30 + 20; // 20〜50pxのランダムなサイズ
-                const speed = this.scrollSpeed + Math.random() * 2; // スピードも少しランダムに
-                
+                const size = Math.random() * 30 + 20; 
                 this.obstacles.push(new Obstacle(
-                    GAME_WIDTH + size, // 画面右端から出現
+                    GAME_WIDTH + size, 
                     GAME_HEIGHT - size, // 地面上
                     size, 
-                    speed, 
-                    '#f55' // 赤色
+                    this.scrollSpeed, // ★ 速度を一定に
+                    '#f55'
                 ));
             },
             
-            // 衝突判定 (AABB: 軸並行境界ボックス)
-            checkCollision(rect1, rect2) {
-                // プレイヤーは y座標が「足元」基準なので、当たり判定を調整
-                const playerTop = rect1.y - rect1.size;
-                const playerBottom = rect1.y;
-                // 障害物も y座標が「足元」基準
-                const obsTop = rect2.y - rect2.size;
-                const obsBottom = rect2.y;
+            // ★ 的を生成
+            spawnTarget() {
+                const size = 20; // サイズは固定
+                this.targets.push(new Target(
+                    GAME_WIDTH + size,
+                    GAME_HEIGHT - 100 - (Math.random() * 50), // 空中 (少し高さをランダムに)
+                    size,
+                    this.scrollSpeed + 3, // ★ 少し速く
+                    '#ff0' // 黄色
+                ));
+            },
+            
+            // ★ プレイヤーと障害物/的の衝突判定
+            // (PlayerとObstacle/Targetはy座標が「底辺」基準)
+            checkPlayerCollision(player, obj) {
+                const playerTop = player.y - player.size;
+                const playerBottom = player.y;
+                const objTop = obj.y - obj.size;
+                const objBottom = obj.y;
 
                 return (
-                    rect1.x < rect2.x + rect2.size &&
-                    rect1.x + rect1.size > rect2.x &&
-                    playerTop < obsBottom &&
-                    playerBottom > obsTop
+                    player.x < obj.x + obj.size &&
+                    player.x + player.size > obj.x &&
+                    playerTop < objBottom &&
+                    playerBottom > objTop
+                );
+            },
+            
+            // ★ 弾丸と障害物/的の衝突判定
+            // (Projectileはyが「上辺」、Obstacle/Targetはyが「底辺」)
+            checkRectCollision(proj, obj) {
+                const projLeft = proj.x;
+                const projRight = proj.x + proj.width;
+                const projTop = proj.y;
+                const projBottom = proj.y + proj.height;
+                
+                const objLeft = obj.x;
+                const objRight = obj.x + obj.size;
+                const objTop = obj.y - obj.size;
+                const objBottom = obj.y;
+
+                return (
+                    projLeft < objRight && projRight > objLeft &&
+                    projTop < objBottom && projBottom > objTop
                 );
             }
         };
 
         // =========================================================
-        // 7. メインゲームループ (大幅拡張)
+        // 8. ★ ゲーム開始関数 (新規追加)
+        // =========================================================
+        function startGame() {
+            // ゲーム変数をすべてリセット
+            game.player = new Player();
+            game.effects = [];
+            game.projectiles = [];
+            game.obstacles = [];
+            game.targets = [];
+            game.obstacleTimer = 0;
+            game.targetTimer = 0;
+            game.score = 0;
+            game.gameOver = false;
+            
+            // UIを非表示
+            startScreen.style.display = 'none';
+            gameOverScreen.style.display = 'none';
+            
+            lastTime = 0;
+            // ゲームループを開始
+            gameLoop(0); 
+        }
+
+        // =========================================================
+        // 9. ★ ゲームオーバー関数 (新規追加)
+        // =========================================================
+        function endGame() {
+            game.gameOver = true;
+            finalScoreEl.textContent = game.score; // 最終スコアを表示
+            gameOverScreen.style.display = 'flex'; // ゲームオーバー画面を表示
+        }
+
+        // =========================================================
+        // 10. メインゲームループ
         // =========================================================
         function gameLoop(timestamp) {
+            // ゲームオーバーならループを停止
+            if (game.gameOver) return;
+
             const deltaTime = timestamp - lastTime;
             lastTime = timestamp;
 
-            // 画面クリア
             ctx.clearRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
 
-            // 地面の描画
+            // 地面
             ctx.fillStyle = '#222';
             ctx.fillRect(0, GAME_HEIGHT - 20, GAME_WIDTH, 20); 
 
-            // スコア表示
+            // スコア
             ctx.fillStyle = 'white';
             ctx.font = '20px sans-serif';
             ctx.fillText(`Score: ${game.score}`, 10, 30);
 
-            // --- ゲームオーバー処理 ---
-            if (game.gameOver) {
-                ctx.fillStyle = 'red';
-                ctx.font = '50px sans-serif';
-                ctx.textAlign = 'center';
-                ctx.fillText('GAME OVER', GAME_WIDTH / 2, GAME_HEIGHT / 2);
-                requestAnimationFrame(gameLoop); // ループは続けるが更新はしない
-                return; // これ以降の更新処理をスキップ
-            }
-
             // --- 更新処理 ---
-
-            // プレイヤー
             game.player.update();
-            game.player.draw();
 
-            // エフェクト
             game.effects.forEach(e => e.update());
-            game.effects.forEach(e => e.draw());
             game.effects = game.effects.filter(e => !e.isDone);
 
-            // 弾丸
             game.projectiles.forEach(p => p.update());
-            game.projectiles.forEach(p => p.draw());
-            // 画面外に出た弾丸を削除
             game.projectiles = game.projectiles.filter(p => p.x < GAME_WIDTH && !p.isDone);
             
-            // 障害物の生成タイマー
-            game.obstacleTimer++;
-            if (game.obstacleTimer % game.obstacleInterval === 0) {
-                game.spawnObstacle();
-            }
-            
             // 障害物
+            game.obstacleTimer++;
+            if (game.obstacleTimer % game.obstacleInterval === 0) game.spawnObstacle();
             game.obstacles.forEach(o => o.update());
-            game.obstacles.forEach(o => o.draw());
-            // 画面外に出た障害物を削除
             game.obstacles = game.obstacles.filter(o => o.x + o.size > 0 && !o.isDone);
+            
+            // ★ 的
+            game.targetTimer++;
+            if (game.targetTimer % game.targetInterval === 0) game.spawnTarget();
+            game.targets.forEach(t => t.update());
+            game.targets = game.targets.filter(t => t.x + t.size > 0 && !t.isDone);
+
+            // --- 描画処理 ---
+            game.player.draw();
+            game.effects.forEach(e => e.draw());
+            game.projectiles.forEach(p => p.draw());
+            game.obstacles.forEach(o => o.draw());
+            game.targets.forEach(t => t.draw()); // ★ 的を描画
 
             // --- 衝突判定 ---
 
             // 1. プレイヤー vs 障害物
             game.obstacles.forEach(obstacle => {
-                if (game.checkCollision(game.player, obstacle)) {
-                    game.gameOver = true;
-                    game.spawnEffect(game.player.x, game.player.y, 'destroy');
+                if (game.checkPlayerCollision(game.player, obstacle)) {
+                    endGame(); // ゲームオーバー
                 }
             });
             
-            // 2. 弾丸 vs 障害物 (二重ループ)
+            // 2. ★ プレイヤー vs 的
+            game.targets.forEach(target => {
+                if (game.checkPlayerCollision(game.player, target)) {
+                    endGame(); // ゲームオーバー
+                }
+            });
+            
+            // 3. 弾丸 vs 障害物
             game.projectiles.forEach(projectile => {
                 game.obstacles.forEach(obstacle => {
-                    // 弾丸と障害物の当たり判定
-                    if (game.checkCollision(projectile, obstacle)) {
-                        projectile.isDone = true; // 弾丸を消す
-                        obstacle.isDone = true; // 障害物を消す
-                        game.score += 100; // スコア加算
-                        
-                        // 破壊エフェクト
+                    if (!projectile.isDone && !obstacle.isDone && game.checkRectCollision(projectile, obstacle)) {
+                        projectile.isDone = true; 
+                        obstacle.isDone = true; 
+                        game.score += 100;
                         game.spawnEffect(obstacle.x + obstacle.size / 2, obstacle.y - obstacle.size / 2, 'destroy');
+                    }
+                });
+                
+                // 4. ★ 弾丸 vs 的
+                game.targets.forEach(target => {
+                    if (!projectile.isDone && !target.isDone && game.checkRectCollision(projectile, target)) {
+                        projectile.isDone = true;
+                        target.isDone = true;
+                        game.score += 200; // 的は高得点
+                        game.spawnEffect(target.x + target.size / 2, target.y - target.size / 2, 'destroy');
                     }
                 });
             });
@@ -300,28 +452,29 @@
         }
 
         // =========================================================
-        // 8. キーボード入力のイベントリスナー
+        // 11. イベントリスナー
         // =========================================================
+        
+        // ★ スタートボタン
+        startButton.addEventListener('click', startGame);
+        
+        // ★ リスタートボタン
+        restartButton.addEventListener('click', startGame);
+
         window.addEventListener('keydown', (e) => {
-            // ゲームオーバー中は操作不可
-            if (game.gameOver) {
-                // (リスタート処理などをここに追加できる)
-                return;
-            }
+            if (game.gameOver || !game.player) return; // ゲーム中でなければ操作不可
             
             switch (e.code) {
                 case 'Space': 
                     game.player.jump();
                     break;
-                case 'ShiftLeft': 
-                case 'Enter': 
+                case 'ArrowRight': // ★ 右矢印キーで射撃
                     game.shoot();
                     break;
             }
         });
-
-        // ゲーム開始
-        gameLoop(0);
+        
+        // ★ 注意: 最初のゲームループはボタンが押されるまで開始しません。
 
     </script>
 
